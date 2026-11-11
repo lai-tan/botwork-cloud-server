@@ -1,0 +1,50 @@
+[package]
+name = "botwork-cloud-server"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[[bin]]
+name = "botwork-cloud-server"
+path = "src/main.rs"
+
+[dependencies]
+adapter-shared = { path = "../adapter-shared" }
+
+# codex-rs app-server 及其依赖（完整列表见 ../vendor/codex/codex-rs/app-server/Cargo.toml）
+codex-app-server = { path = "../vendor/codex/codex-rs/app-server" }
+codex-app-server-client = { path = "../vendor/codex/codex-rs/app-server-client" }
+codex-app-server-protocol = { path = "../vendor/codex/codex-rs/app-server-protocol" }
+codex-arg0 = { path = "../vendor/codex/codex-rs/arg0" }
+codex-config = { path = "../vendor/codex/codex-rs/config" }
+codex-core = { path = "../vendor/codex/codex-rs/core" }
+codex-exec-server = { path = "../vendor/codex/codex-rs/exec-server" }
+codex-feedback = { path = "../vendor/codex/codex-rs/feedback" }
+codex-protocol = { path = "../vendor/codex/codex-rs/protocol" }
+codex-utils-cli = { path = "../vendor/codex/codex-rs/utils/cli" }
+codex-websocket-auth = { path = "../vendor/codex/codex-rs/websocket-auth" }
+
+# CLI + 运行时
+clap = { version = "4", features = ["derive", "env"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# --schedule 调度守护依赖；版本均对齐现有 Cargo.lock 已解析条目，不引入新的 crates.io 下载
+axum = { version = "0.8", features = ["http1", "tokio"] }
+chrono = { version = "0.4", features = ["serde"] }
+dashmap = "6"
+libc = "0.2"
+rand = "0.9"
+scopeguard = "1"
+tokio-util = "0.7"
+tracing-appender = "0.2"
+uuid = { version = "1", features = ["v4"] }
+
+# 版本锁定（与 bot-work-windows 保持一致，避免 rama-error 0.3.0 稳定版缺少 OpaqueError）
+rama-error = "=0.3.0-alpha.4"
+rama-utils = "=0.3.0-alpha.4"

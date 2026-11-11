@@ -1,0 +1,13 @@
+[package]
+name = "codex-mxc-sandbox"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+codex-network-proxy = { workspace = true }
+codex-protocol = { workspace = true }

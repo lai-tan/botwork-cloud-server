@@ -1,0 +1,13 @@
+[workspace]
+members = ["adapter-shared", "server"]
+exclude = ["vendor"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+[patch.crates-io]
+tungstenite = { path = "vendor/git-deps/tungstenite-fork" }
+tokio-tungstenite = { path = "vendor/git-deps/tokio-tungstenite-fork" }
+nucleo = { path = "vendor/git-deps/nucleo" }

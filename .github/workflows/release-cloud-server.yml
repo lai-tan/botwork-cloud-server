@@ -1,0 +1,75 @@
+name: release-cloud-server
+
+# tag push (e.g. cloud-server-v0.1.0) triggers: cross cross-compile both targets -> sha256 -> GitHub Release
+# Post-release reminder: sync bot-work-windows MIN_CLOUD_SERVER_VERSION (avoid dual-repo version drift)
+
+on:
+  push:
+    tags:
+      - 'cloud-server-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [aarch64-unknown-linux-gnu, x86_64-unknown-linux-gnu]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cross
+        run: cargo install cross --locked
+
+      - name: Build (${{ matrix.target }})
+        run: cross build --release --target ${{ matrix.target }} --bin botwork-cloud-server
+
+      - name: Package (tar.gz + separate sha256 asset)
+        run: |
+          PKG_NAME="botwork-cloud-server-${{ matrix.target }}.tar.gz"
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/botwork-cloud-server" dist/
+          tar -czf "${PKG_NAME}" -C dist botwork-cloud-server
+          sha256sum "${PKG_NAME}" > "${PKG_NAME}.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkg-${{ matrix.target }}
+          path: |
+            *.tar.gz
+            *.sha256
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          body: |
+            ## botwork-cloud-server ${{ github.ref_name }}
+
+            Prebuilt binaries for glibc Linux (aarch64 / x86_64).
+
+            - `botwork-cloud-server-<target>.tar.gz` — server binary (`botwork-cloud-server`)
+            - `*.sha256` — checksum for `sha256sum -c`
+
+            Install with the app-driven installer (`install-cloud-server.sh`), which
+            verifies the sha256 before extracting.
+
+      - name: Version sync reminder
+        run: |
+          echo "=============================================="
+          echo "REMINDER: sync bot-work-windows MIN_CLOUD_SERVER_VERSION to ${GITHUB_REF_NAME#cloud-server-v}"
+          echo "(edit src-tauri/src/domain/strategy/cloud_server_installer.rs and release a new app version)"
+          echo "=============================================="

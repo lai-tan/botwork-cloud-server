@@ -1,0 +1,117 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          botwork-cloud-schedule
+# Required-Start:    $network
+# Required-Stop:     $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: BotWork schedule daemon
+# Description:       botwork-cloud-server --schedule automation scheduler
+### END INIT INFO
+
+# SysV init 脚本（三级回退优先级 2：无 systemd 但 service 可用——目标 chroot 环境即此级别）
+# 设计依据：AUTOMATION-DESIGN.md §5.2 部署三级回退
+#
+# 关键注意（历史教训）：
+# - start-stop-daemon 分支不做输出重定向（曾因 >> log 2>&1 导致 init 脚本启动失败）；
+#   日志由进程内 tracing-appender 写 /root/bot-work/logs/schedule-YYYYMMDD.log
+# - export HOME=/root：chroot 环境 HOME 可能缺失，缺失会导致进程启动即崩溃
+# - stop 必须先杀 watchdog（否则 stop 会被 watchdog 视为崩溃而重新拉起服务）
+# - service 命令存在不代表正常工作：部署时先直接运行本脚本验证，再测 service 包装层
+
+export HOME=/root
+
+DAEMON=/usr/local/bin/botwork-cloud-server
+ENV_FILE=/root/bot-work/schedule-daemon.env
+PIDFILE=/run/botwork-cloud-schedule.pid
+WDPIDFILE=/run/botwork-watchdog.pid
+
+[ -f "$ENV_FILE" ] && . "$ENV_FILE"
+PORT="${SCHEDULE_HEALTH_PORT:-8081}"
+CONFIG="${SCHEDULE_CONFIG:-/root/bot-work/schedules.json}"
+API_KEY="${SCHEDULE_API_KEY:-}"
+BASE_URL="${SCHEDULE_BASE_URL:-}"
+BOT_WEB_URL="${SCHEDULE_BOT_WEB_URL:-}"
+BOT_WEB_USERNAME="${SCHEDULE_BOT_WEB_USERNAME:-}"
+BOT_WEB_PUSH_TOKEN="${SCHEDULE_BOT_WEB_PUSH_TOKEN:-}"
+MAX_CONCURRENT="${SCHEDULE_MAX_CONCURRENT:-5}"
+HANDOFF_SLOTS="${SCHEDULE_HANDOFF_SLOTS:-2}"
+MAX_EXEC="${SCHEDULE_MAX_EXECUTION_TIME:-1800}"
+
+ARGS="--schedule --schedule-config $CONFIG --health-port $PORT --max-concurrent $MAX_CONCURRENT --handoff-slots $HANDOFF_SLOTS --max-execution-time $MAX_EXEC"
+[ -n "$API_KEY" ] && ARGS="$ARGS --api-key $API_KEY"
+[ -n "$BASE_URL" ] && ARGS="$ARGS --base-url $BASE_URL"
+[ -n "$BOT_WEB_URL" ] && ARGS="$ARGS --bot-web-server-url $BOT_WEB_URL"
+[ -n "$BOT_WEB_USERNAME" ] && ARGS="$ARGS --bot-web-server-username $BOT_WEB_USERNAME"
+[ -n "$BOT_WEB_PUSH_TOKEN" ] && ARGS="$ARGS --bot-web-server-push-token $BOT_WEB_PUSH_TOKEN"
+[ -n "${SCHEDULE_API_TOKEN:-}" ] && ARGS="$ARGS --api-token $SCHEDULE_API_TOKEN"
+
+read_pid() { [ -f "$1" ] && cat "$1" 2>/dev/null; }
+
+is_running() {
+    PID=$(read_pid "$PIDFILE")
+    if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+        return 0
+    fi
+    pgrep -f "botwork-cloud-server --schedule" >/dev/null 2>&1
+}
+
+case "$1" in
+    start)
+        if is_running; then
+            echo "botwork-cloud-schedule already running (pid $(read_pid "$PIDFILE"))"
+            exit 0
+        fi
+        mkdir -p /root/bot-work/logs
+        SSD=/usr/sbin/start-stop-daemon
+        if [ -x "$SSD" ]; then
+            "$SSD" --start --background --make-pidfile --pidfile "$PIDFILE" \
+                --exec "$DAEMON" -- $ARGS
+        else
+            setsid sh -c "exec '$DAEMON' $ARGS >> /root/bot-work/logs/stderr.log 2>&1" &
+            echo $! > "$PIDFILE"
+        fi
+        # 顺带拉起 watchdog（其内部防重复检查，不会叠多个实例）
+        setsid nohup /root/bot-work/watchdog.sh >/dev/null 2>&1 &
+        ;;
+    stop)
+        # ① 先杀 watchdog（否则 stop 会被 watchdog 视为崩溃而重新拉起服务）
+        WD=$(read_pid "$WDPIDFILE")
+        [ -n "$WD" ] && kill -TERM "$WD" 2>/dev/null
+        rm -f "$WDPIDFILE"
+        # ② SIGTERM 优雅停机（进程内 ≤30s，见 §5.2.1 优雅停机），脚本侧等待 ≤35s，超时 KILL
+        PID=$(read_pid "$PIDFILE")
+        if [ -z "$PID" ]; then
+            echo "not running"
+            exit 0
+        fi
+        kill -TERM "$PID" 2>/dev/null
+        i=0
+        while [ "$i" -lt 35 ] && kill -0 "$PID" 2>/dev/null; do
+            sleep 1
+            i=$((i + 1))
+        done
+        kill -0 "$PID" 2>/dev/null && kill -KILL "$PID" 2>/dev/null
+        rm -f "$PIDFILE"
+        ;;
+    restart|force-reload)
+        "$0" stop
+        sleep 1
+        "$0" start
+        ;;
+    status)
+        PID=$(read_pid "$PIDFILE")
+        if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+            echo "running (pid $PID)"
+            exit 0
+        fi
+        echo "stopped"
+        exit 3
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status}"
+        exit 1
+        ;;
+esac
+
+exit 0

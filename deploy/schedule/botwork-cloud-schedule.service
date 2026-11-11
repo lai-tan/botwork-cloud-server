@@ -1,0 +1,15 @@
+[Unit]
+Description=BotWork Cloud Schedule Daemon
+After=network.target
+
+[Service]
+Type=simple
+Environment=HOME=/root
+EnvironmentFile=/root/bot-work/schedule-daemon.env
+ExecStart=/usr/local/bin/botwork-cloud-server --schedule --schedule-config ${SCHEDULE_CONFIG} --health-port ${SCHEDULE_HEALTH_PORT} --max-concurrent ${SCHEDULE_MAX_CONCURRENT} --handoff-slots ${SCHEDULE_HANDOFF_SLOTS} --max-execution-time ${SCHEDULE_MAX_EXECUTION_TIME} --api-key ${SCHEDULE_API_KEY} --base-url ${SCHEDULE_BASE_URL} --bot-web-server-url ${SCHEDULE_BOT_WEB_URL}
+Restart=always
+RestartSec=5
+TimeoutStopSec=35
+
+[Install]
+WantedBy=multi-user.target

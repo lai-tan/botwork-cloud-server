@@ -1,0 +1,10 @@
+# Rust
+/target
+
+# Python
+__pycache__/
+*.pyc
+
+# 本地运维脚本（含设备密码/内网拓扑，禁止入库）
+setup_ssh_key.py
+upload_to_remote.py
