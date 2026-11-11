@@ -1,8 +1,12 @@
 name: release-cloud-server
 
-# tag push (e.g. cloud-server-v0.1.0) triggers: native build both targets -> sha256 -> GitHub Release
+# tag push (e.g. cloud-server-v0.1.0) triggers: native build both targets -> sha256 -> Release
 # Native runners instead of cross: codex-rs requires edition 2024 (rustc >= 1.85),
 # cross default docker images ship an older rustc.
+# Release assets are published to the PUBLIC dist repo lai-tan/botwork-cloud-server-dist
+# (this repo stays PRIVATE — source is not open-sourced); the device installer downloads
+# from the dist repo anonymously. Requires secret DIST_RELEASE_TOKEN (fine-grained PAT,
+# Contents read/write on the dist repo only).
 # Post-release reminder: sync bot-work-windows MIN_CLOUD_SERVER_VERSION (avoid dual-repo version drift)
 
 on:
@@ -60,9 +64,19 @@ jobs:
           merge-multiple: true
           path: dist
 
-      - name: Create GitHub Release
+      - name: Reset existing release in dist repo (idempotent re-release)
+        env:
+          GH_TOKEN: ${{ secrets.DIST_RELEASE_TOKEN }}
+        run: |
+          gh release delete "${{ github.ref_name }}" \
+            --repo lai-tan/botwork-cloud-server-dist \
+            --yes --cleanup-tag || true
+
+      - name: Create GitHub Release (public dist repo)
         uses: softprops/action-gh-release@v2
         with:
+          repository: lai-tan/botwork-cloud-server-dist
+          token: ${{ secrets.DIST_RELEASE_TOKEN }}
           files: dist/*
           body: |
             ## botwork-cloud-server ${{ github.ref_name }}

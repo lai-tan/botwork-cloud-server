@@ -23,7 +23,7 @@
 # Usage:
 #   bash install-cloud-server.sh <min_version> [adapter_port] [schedule_port] [upstream_url]
 # Env override: BOTWORK_RELEASE_BASE_URL (default: GitHub releases of
-#   github.com/lai-tan/botwork-cloud-server)
+#   github.com/lai-tan/botwork-cloud-server-dist — public dist repo, source repo stays private)
 
 set -uo pipefail
 
@@ -43,7 +43,7 @@ ASSETS_DIR="$INSTALL_DIR/assets"
 BACKUP="$BIN.bak"
 BOOT="$WORK_DIR/boot-services.sh"
 
-BASE_URL="${BOTWORK_RELEASE_BASE_URL:-https://github.com/lai-tan/botwork-cloud-server/releases/download}"
+BASE_URL="${BOTWORK_RELEASE_BASE_URL:-https://github.com/lai-tan/botwork-cloud-server-dist/releases/download}"
 
 RESULT_EMITTED=0
 
