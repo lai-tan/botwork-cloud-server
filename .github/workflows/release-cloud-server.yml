@@ -64,30 +64,18 @@ jobs:
           merge-multiple: true
           path: dist
 
-      - name: Reset existing release in dist repo (idempotent re-release)
+      - name: Publish release to public dist repo
         env:
           GH_TOKEN: ${{ secrets.DIST_RELEASE_TOKEN }}
         run: |
-          gh release delete "${{ github.ref_name }}" \
-            --repo lai-tan/botwork-cloud-server-dist \
-            --yes --cleanup-tag || true
-
-      - name: Create GitHub Release (public dist repo)
-        uses: softprops/action-gh-release@v2
-        with:
-          repository: lai-tan/botwork-cloud-server-dist
-          token: ${{ secrets.DIST_RELEASE_TOKEN }}
-          files: dist/*
-          body: |
-            ## botwork-cloud-server ${{ github.ref_name }}
-
-            Prebuilt binaries for glibc Linux (aarch64 / x86_64).
-
-            - `botwork-cloud-server-<target>.tar.gz` — server binary (`botwork-cloud-server`)
-            - `*.sha256` — checksum for `sha256sum -c`
-
-            Install with the app-driven installer (`install-cloud-server.sh`), which
-            verifies the sha256 before extracting.
+          TAG="${{ github.ref_name }}"
+          DIST_REPO="lai-tan/botwork-cloud-server-dist"
+          gh release delete "$TAG" --repo "$DIST_REPO" --yes --cleanup-tag || true
+          gh release create "$TAG" \
+            --repo "$DIST_REPO" \
+            --title "botwork-cloud-server $TAG" \
+            --notes "Prebuilt binaries for glibc Linux (aarch64 / x86_64). Install with the app-driven installer (install-cloud-server.sh), which verifies the sha256 before extracting." \
+            dist/*.tar.gz dist/*.sha256
 
       - name: Version sync reminder
         run: |
