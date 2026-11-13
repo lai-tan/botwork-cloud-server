@@ -461,6 +461,7 @@ impl MessageProcessor {
             config_warnings.clone(),
             rpc_transport,
             Arc::clone(&user_verification),
+            Arc::clone(&auth_manager),
         );
         let marketplace_processor = MarketplaceRequestProcessor::new(
             Arc::clone(&config),

@@ -28,6 +28,7 @@ pub(crate) struct InitializeRequestProcessor {
     config_warnings: Arc<Vec<ConfigWarningNotification>>,
     rpc_transport: AppServerRpcTransport,
     user_verification: Arc<crate::user_verification::Service>,
+    auth_manager: Arc<codex_login::AuthManager>,
 }
 
 impl InitializeRequestProcessor {
@@ -40,6 +41,7 @@ impl InitializeRequestProcessor {
         config_warnings: Vec<ConfigWarningNotification>,
         rpc_transport: AppServerRpcTransport,
         user_verification: Arc<crate::user_verification::Service>,
+        auth_manager: Arc<codex_login::AuthManager>,
     ) -> Self {
         Self {
             gateway_login_control,
@@ -50,6 +52,7 @@ impl InitializeRequestProcessor {
             config_warnings: Arc::new(config_warnings),
             rpc_transport,
             user_verification,
+            auth_manager,
         }
     }
 
@@ -57,7 +60,7 @@ impl InitializeRequestProcessor {
         &self,
         connection_id: ConnectionId,
         request_id: RequestId,
-        params: InitializeParams,
+        mut params: InitializeParams,
         session: &ConnectionSessionState,
         // `Some(...)` means the caller wants initialize to immediately mark the
         // connection outbound-ready. Websocket JSON-RPC calls pass `None` so
@@ -70,6 +73,17 @@ impl InitializeRequestProcessor {
         };
         if session.initialized() {
             return Err(invalid_request("Already initialized"));
+        }
+
+        // §4.3-5e: Extract credentials from initialize params (SSH handshake channel).
+        // Store API key in AuthManager (memory only — no env/disk/file) and dispatch
+        // the full credential map to the host binary so it can start the upstream adapter.
+        if let Some(creds) = params.credentials.take() {
+            if let Some(api_key) = creds.get("OPENAI_API_KEY") {
+                self.auth_manager
+                    .set_cached_auth(Some(codex_login::CodexAuth::from_api_key(api_key)));
+            }
+            crate::dispatch_credentials(creds);
         }
 
         // TODO(maxj): Revisit capability scoping for `experimental_api_enabled`.

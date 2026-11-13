@@ -1,6 +1,36 @@
 #![recursion_limit = "256"]
 #![deny(clippy::print_stdout, clippy::print_stderr)]
 
+/// §4.3-5e Credential bridge: allows the host binary (cloud-server) to receive
+/// credentials extracted from the initialize handshake by the in-process
+/// app-server.  The host sets a oneshot sender before calling
+/// `run_main_with_transport_options`; the initialize processor dispatches
+/// credentials through it so the host can start the upstream adapter.
+static CREDENTIAL_BRIDGE: std::sync::OnceLock<
+    std::sync::Mutex<
+        Option<tokio::sync::oneshot::Sender<std::collections::HashMap<String, String>>>,
+    >,
+> = std::sync::OnceLock::new();
+
+/// Install the credential-channel sender.  Call once before
+/// `run_main_with_transport_options`.
+pub fn set_credential_bridge(
+    sender: tokio::sync::oneshot::Sender<std::collections::HashMap<String, String>>,
+) {
+    let _ = CREDENTIAL_BRIDGE.set(std::sync::Mutex::new(Some(sender)));
+}
+
+/// Dispatch credentials extracted from initialize params to the host.
+pub(crate) fn dispatch_credentials(creds: std::collections::HashMap<String, String>) {
+    if let Some(mtx) = CREDENTIAL_BRIDGE.get() {
+        if let Ok(mut guard) = mtx.lock() {
+            if let Some(sender) = guard.take() {
+                let _ = sender.send(creds);
+            }
+        }
+    }
+}
+
 use codex_arg0::Arg0DispatchPaths;
 use codex_code_mode::CodeModeSessionProvider;
 use codex_code_mode::GrpcCodeModeSessionProvider;

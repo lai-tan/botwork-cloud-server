@@ -2626,7 +2626,7 @@ impl AuthManager {
         })
     }
 
-    fn set_cached_auth(&self, new_auth: Option<CodexAuth>) -> bool {
+    pub fn set_cached_auth(&self, new_auth: Option<CodexAuth>) -> bool {
         if let Ok(mut guard) = self.inner.write() {
             let previous = guard.auth.as_ref();
             let changed = !AuthManager::auths_equal(previous, new_auth.as_ref());

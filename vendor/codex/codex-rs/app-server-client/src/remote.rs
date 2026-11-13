@@ -112,6 +112,7 @@ impl RemoteAppServerConnectArgs {
                 version: self.client_version.clone(),
             },
             capabilities: Some(capabilities),
+            credentials: None,
         }
     }
 }

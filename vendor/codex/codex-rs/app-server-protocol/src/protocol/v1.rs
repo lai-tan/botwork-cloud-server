@@ -30,6 +30,11 @@ pub struct InitializeParams {
     pub client_info: ClientInfo,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<InitializeCapabilities>,
+    /// §4.3-5e SSH handshake credential channel (cloud-server extension).
+    /// Carries OPENAI_API_KEY / AGNES_API_KEY / BOTWORK_PROVIDERS so the
+    /// in-process app-server can start its adapter without env or disk.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credentials: Option<HashMap<String, String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default, JsonSchema, TS)]
