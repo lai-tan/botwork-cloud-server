@@ -77,6 +77,18 @@ jobs:
             --notes "Prebuilt binaries for glibc Linux (aarch64 / x86_64). Install with the app-driven installer (install-cloud-server.sh), which verifies the sha256 before extracting." \
             dist/*.tar.gz dist/*.sha256
 
+      - name: Update cloud-server-latest tag in dist repo
+        env:
+          GH_TOKEN: ${{ secrets.DIST_RELEASE_TOKEN }}
+        run: |
+          DIST_REPO="lai-tan/botwork-cloud-server-dist"
+          gh release delete "cloud-server-latest" --repo "$DIST_REPO" --yes --cleanup-tag || true
+          gh release create "cloud-server-latest" \
+            --repo "$DIST_REPO" \
+            --title "botwork-cloud-server latest" \
+            --notes "Latest prebuilt binaries (currently ${{ github.ref_name }}). Install with the app-driven installer (install-cloud-server.sh)." \
+            dist/*.tar.gz dist/*.sha256
+
       - name: Version sync reminder
         run: |
           echo "=============================================="
